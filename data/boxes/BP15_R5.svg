@@ -1,2 +1,2 @@
-<?xml version='1.0' encoding='utf-8'?>
-<svg width="256" height="222" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 222"><rect width="256" height="222" fill="white" /><circle cx="129" cy="128" r="106" fill="black" /><path d="M 0,0 L 0,221 L 255,221 L 255,0 Z" fill="none" stroke="black" stroke-width="1" /></svg>
+<?xml version="1.0" encoding="utf-8" ?>
+<svg baseProfile="full" height="222" version="1.1" width="256" xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink"><defs /><rect fill="white" height="222" width="256" x="0" y="0" /><path d="M 24,108 L 120,23 L 216,76 L 165,125 L 213,196 L 38,146 L 200,187 L 206,76 L 122,32 Z" fill="black" stroke="black" stroke-width="1" /><path d="M 0,0 L 0,221 L 255,221 L 255,0 Z" fill="none" stroke="black" stroke-width="1" /></svg>

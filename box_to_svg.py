@@ -3,120 +3,98 @@ import numpy as np
 from pathlib import Path
 import xml.etree.ElementTree as ET
 import os
+import svgwrite
 
 class BoxToSVGConverter:
     def __init__(self, input_folder="data/boxes"):
         """Initialize with input folder path."""
         self.input_folder = Path(input_folder)
         
-    def detect_shapes(self, img):
-        """Detect shapes in a binary image and return their properties."""
-        # Convert to binary if not already
-        if len(img.shape) > 2:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            
-        # Create a copy of the original image for outline detection
-        outline_img = img.copy()
+    def detect_shapes(self, image):
+        # Convert to grayscale if needed
+        if len(image.shape) > 2:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image
+
+        # Create binary image
+        _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+
+        # Find contours
+        contours, hierarchy = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         
-        # Find contours for filled shapes
-        _, binary = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY_INV)
-        filled_contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        # Find contours for outlines
-        _, outline_binary = cv2.threshold(outline_img, 127, 255, cv2.THRESH_BINARY)
-        outline_contours, _ = cv2.findContours(outline_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if hierarchy is None:
+            return []
         
         shapes = []
-        
-        # Process filled shapes
-        for contour in filled_contours:
+        for i, contour in enumerate(contours):
             # Skip very small contours
             if cv2.contourArea(contour) < 10:
                 continue
-                
+            
             # Get shape properties
-            shape_info = {
-                'points': contour.reshape(-1, 2).tolist(),
-                'area': cv2.contourArea(contour),
-                'perimeter': cv2.arcLength(contour, True),
-                'is_closed': cv2.arcLength(contour, True) > 0,
-                'is_filled': True
-            }
+            area = cv2.contourArea(contour)
+            perimeter = cv2.arcLength(contour, True)
             
-            # Try to fit different shapes
-            approx = cv2.approxPolyDP(contour, 0.04 * cv2.arcLength(contour, True), True)
+            # Approximate the contour to reduce noise
+            epsilon = 0.02 * perimeter
+            approx = cv2.approxPolyDP(contour, epsilon, True)
             
-            if len(approx) == 3:
-                shape_info['type'] = 'triangle'
-            elif len(approx) == 4:
-                shape_info['type'] = 'rectangle'
-            elif len(approx) > 8:
+            # Determine shape type based on number of vertices
+            vertices = len(approx)
+            if vertices == 3:
+                shape_type = 'triangle'
+            elif vertices == 4:
+                # Check if it's a rectangle
+                x, y, w, h = cv2.boundingRect(approx)
+                aspect_ratio = float(w)/h
+                if 0.95 <= aspect_ratio <= 1.05:
+                    shape_type = 'square'
+                else:
+                    shape_type = 'rectangle'
+            elif vertices > 8:
                 # Check if it's a circle
                 (x, y), radius = cv2.minEnclosingCircle(contour)
-                shape_info['type'] = 'circle'
-                shape_info['center'] = (int(x), int(y))
-                shape_info['radius'] = int(radius)
+                center = (int(x), int(y))
+                radius = int(radius)
+                # Compare the contour area with the circle area
+                circle_area = np.pi * radius * radius
+                if abs(area - circle_area) / circle_area < 0.1:
+                    shape_type = 'circle'
+                else:
+                    shape_type = 'polygon'
             else:
-                shape_info['type'] = 'polygon'
-                shape_info['vertices'] = len(approx)
-            
-            shapes.append(shape_info)
-        
-        # Process outline shapes
-        for contour in outline_contours:
-            # Skip very small contours
-            if cv2.contourArea(contour) < 10:
-                continue
-                
-            # Check if this contour is already processed as a filled shape
-            # by comparing with filled contours
-            is_duplicate = False
-            for filled_contour in filled_contours:
-                if cv2.matchShapes(contour, filled_contour, cv2.CONTOURS_MATCH_I1, 0.0) < 0.1:
-                    is_duplicate = True
-                    break
-            
-            if is_duplicate:
-                continue
-                
-            # Get shape properties
-            shape_info = {
-                'points': contour.reshape(-1, 2).tolist(),
-                'area': cv2.contourArea(contour),
-                'perimeter': cv2.arcLength(contour, True),
-                'is_closed': cv2.arcLength(contour, True) > 0,
-                'is_filled': False
-            }
-            
-            # Try to fit different shapes
-            approx = cv2.approxPolyDP(contour, 0.04 * cv2.arcLength(contour, True), True)
-            
-            if len(approx) == 3:
-                shape_info['type'] = 'triangle'
-            elif len(approx) == 4:
-                shape_info['type'] = 'rectangle'
-            elif len(approx) > 8:
-                # Check if it's a circle
-                (x, y), radius = cv2.minEnclosingCircle(contour)
-                shape_info['type'] = 'circle'
-                shape_info['center'] = (int(x), int(y))
-                shape_info['radius'] = int(radius)
+                shape_type = 'polygon'
+
+            # Check if the shape is filled by examining the pixel values inside the contour
+            mask = np.zeros(binary.shape, dtype=np.uint8)
+            cv2.drawContours(mask, [contour], 0, 255, -1)
+            mean_val = cv2.mean(binary, mask=mask)[0]
+            is_filled = mean_val < 127  # If mean value is less than 127, the shape is filled (black)
+
+            # Get the points for the shape
+            if shape_type == 'circle':
+                points = [(center[0], center[1], radius)]
             else:
-                shape_info['type'] = 'polygon'
-                shape_info['vertices'] = len(approx)
-            
-            shapes.append(shape_info)
-            
+                points = approx.reshape(-1, 2).tolist()
+
+            shapes.append({
+                'type': shape_type,
+                'points': points,
+                'area': area,
+                'perimeter': perimeter,
+                'is_filled': is_filled
+            })
+
         return shapes
         
-    def create_svg(self, shapes, width, height, output_path):
-        """Create an SVG file from the detected shapes."""
+    def create_svg(self, shapes, width, height):
+        """Create an SVG file from detected shapes."""
         # Create SVG root element
         svg = ET.Element('svg')
         svg.set('width', str(width))
         svg.set('height', str(height))
         svg.set('xmlns', 'http://www.w3.org/2000/svg')
-        svg.set('viewBox', f'0 0 {width} {height}')
         
         # Add white background
         background = ET.SubElement(svg, 'rect')
@@ -128,61 +106,127 @@ class BoxToSVGConverter:
         for shape in shapes:
             if shape['type'] == 'circle':
                 circle = ET.SubElement(svg, 'circle')
-                circle.set('cx', str(shape['center'][0]))
-                circle.set('cy', str(shape['center'][1]))
-                circle.set('r', str(shape['radius']))
-                
+                circle.set('cx', str(shape['points'][0][0]))
+                circle.set('cy', str(shape['points'][0][1]))
+                circle.set('r', str(shape['points'][0][2]))
+                circle.set('stroke', 'black')
+                circle.set('stroke-width', '1')
                 if shape['is_filled']:
                     circle.set('fill', 'black')
                 else:
                     circle.set('fill', 'none')
-                    circle.set('stroke', 'black')
-                    circle.set('stroke-width', '1')
+                
             else:
-                # Create path for other shapes
                 path = ET.SubElement(svg, 'path')
                 points = shape['points']
                 d = f"M {points[0][0]},{points[0][1]}"
                 for point in points[1:]:
                     d += f" L {point[0]},{point[1]}"
-                if shape['is_closed']:
+                if shape['is_filled']:
                     d += " Z"
                 path.set('d', d)
-                
+                path.set('stroke', 'black')
+                path.set('stroke-width', '1')
                 if shape['is_filled']:
                     path.set('fill', 'black')
                 else:
                     path.set('fill', 'none')
-                    path.set('stroke', 'black')
-                    path.set('stroke-width', '1')
         
-        # Create XML tree and save
-        tree = ET.ElementTree(svg)
-        tree.write(output_path, encoding='utf-8', xml_declaration=True)
+        return svg
+        
+    def process_box(self, box_path):
+        """Process a single box image and convert it to SVG."""
+        try:
+            # Read the image
+            image = cv2.imread(box_path)
+            if image is None:
+                print(f"Error: Could not read image {box_path}")
+                return
+
+            # Get original image dimensions
+            height, width = image.shape[:2]
+
+            # Convert to grayscale if needed
+            if len(image.shape) > 2:
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = image
+
+            # Create binary image for contour detection
+            _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+
+            # Find contours - use RETR_LIST to get all contours at same hierarchy level
+            contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+            # Create SVG file path
+            svg_path = os.path.splitext(box_path)[0] + '.svg'
+
+            # Create SVG with original dimensions
+            dwg = svgwrite.Drawing(svg_path, size=(width, height))
+
+            # Add white background
+            dwg.add(dwg.rect(insert=(0, 0), size=(width, height), fill='white'))
+
+            # Process each contour
+            for contour in contours:
+                # Skip very small contours
+                if cv2.contourArea(contour) < 10:
+                    continue
+
+                # Create a mask to check if the shape is filled
+                mask = np.zeros(binary.shape, dtype=np.uint8)
+                cv2.drawContours(mask, [contour], 0, 255, -1)
+                mean_val = cv2.mean(binary, mask=mask)[0]
+                is_filled = mean_val < 127  # If mean value is less than 127, the shape is filled (black)
+
+                # Approximate the contour to detect shape type
+                epsilon = 0.04 * cv2.arcLength(contour, True)
+                approx = cv2.approxPolyDP(contour, epsilon, True)
                 
-    def process_box(self, image_path):
-        """Process a single box image and create SVG file."""
-        # Read image
-        img = cv2.imread(str(image_path))
-        if img is None:
-            print(f"Error: Could not open {image_path}")
-            return
-            
-        # Get image dimensions
-        height, width = img.shape[:2]
-        
-        # Detect shapes
-        shapes = self.detect_shapes(img)
-        
-        # Create output path
-        base_path = image_path.with_suffix('')
-        svg_path = base_path.with_suffix('.svg')
-        
-        # Create SVG
-        self.create_svg(shapes, width, height, svg_path)
-        
-        print(f"Processed {image_path.name}")
-        print(f"Created: {svg_path.name}")
+                # Convert points to SVG format
+                points = []
+                for point in approx:
+                    x, y = point[0]
+                    points.append((x, y))
+
+                # Determine shape type based on number of vertices
+                num_vertices = len(points)
+                
+                if num_vertices == 3:
+                    shape_type = 'triangle'
+                elif num_vertices == 4:
+                    # Check if it's a square or rectangle
+                    x, y, w, h = cv2.boundingRect(contour)
+                    aspect_ratio = float(w)/h
+                    shape_type = 'square' if 0.95 <= aspect_ratio <= 1.05 else 'rectangle'
+                else:
+                    # Check if it's a circle
+                    area = cv2.contourArea(contour)
+                    perimeter = cv2.arcLength(contour, True)
+                    circularity = 4 * np.pi * area / (perimeter * perimeter)
+                    shape_type = 'circle' if circularity > 0.8 else 'polygon'
+
+                # Create SVG element based on shape type
+                if shape_type == 'circle':
+                    (x, y), radius = cv2.minEnclosingCircle(contour)
+                    dwg.add(dwg.circle(center=(x, y), r=radius,
+                                     fill='black' if is_filled else 'none',
+                                     stroke='black',
+                                     stroke_width=1))
+                else:
+                    # Create path for other shapes
+                    path_data = 'M ' + ' L '.join([f'{x},{y}' for x, y in points]) + ' Z'
+                    dwg.add(dwg.path(d=path_data,
+                                   fill='black' if is_filled else 'none',
+                                   stroke='black',
+                                   stroke_width=1))
+
+            # Save the SVG file
+            dwg.save()
+            print(f"Created: {os.path.basename(svg_path)}")
+
+        except Exception as e:
+            print(f"Error processing {box_path}: {str(e)}")
         
     def process_all_boxes(self):
         """Process all box images in the input folder."""
