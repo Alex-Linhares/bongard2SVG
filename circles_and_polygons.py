@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from xml.etree import ElementTree as ET
 
 class ImagePreprocessor:
     def __init__(self):
@@ -22,6 +23,7 @@ class ImagePreprocessor:
             return False
             
         self.binary_image = img
+        self.height, self.width = img.shape
         
         # Optional: Show the loaded image for debugging
         cv2.imshow("Loaded Binary Image", self.binary_image)
@@ -30,51 +32,79 @@ class ImagePreprocessor:
         
         return True
 
+def create_svg(shapes, width, height, output_path):
+    """Creates an SVG file from the detected shapes."""
+    # Create the SVG root element
+    svg = ET.Element('svg')
+    svg.set('width', str(width))
+    svg.set('height', str(height))
+    svg.set('xmlns', 'http://www.w3.org/2000/svg')
+    
+    # Add white background
+    background = ET.SubElement(svg, 'rect')
+    background.set('width', str(width))
+    background.set('height', str(height))
+    background.set('fill', 'white')
+    
+    # Add shapes to SVG - all black filled
+    for shape in shapes:
+        if shape['type'] == 'contour':
+            # Create path for complex shapes
+            path = ET.SubElement(svg, 'path')
+            # Convert contour points to SVG path data
+            d = "M " + " L ".join([f"{pt[0]},{pt[1]}" for pt in shape['points']]) + " Z"
+            path.set('d', d)
+            path.set('fill', 'black')
+    
+    # Create XML tree and save to file
+    tree = ET.ElementTree(svg)
+    with open(output_path, 'wb') as f:
+        tree.write(f, encoding='utf-8', xml_declaration=True)
+
 def detect_shapes(image_path):
-    """Detects circles and polygons in a binary image."""
+    """Detects shapes in a binary image."""
+    print(f"\nAnalyzing image: {image_path}")
+    print("-" * 50)
+    
     # Create preprocessor instance
     preprocessor = ImagePreprocessor()
     if not preprocessor.load_and_binarize(image_path):
         return
 
     # Use the binary image for shape detection
-    img = cv2.cvtColor(preprocessor.binary_image.copy(), cv2.COLOR_GRAY2BGR)  # Convert to BGR for colored drawings
+    img = cv2.cvtColor(preprocessor.binary_image.copy(), cv2.COLOR_GRAY2BGR)
     binary_img = preprocessor.binary_image
 
-    # Detect circles with adjusted parameters for binary images
-    circles = cv2.HoughCircles(
-        binary_img, 
-        cv2.HOUGH_GRADIENT, 
-        dp=1, 
-        minDist=30,  # Minimum distance between circles
-        param1=50,   # Upper threshold for edge detection
-        param2=30,   # Threshold for center detection
-        minRadius=10,
-        maxRadius=100
-    )
+    # List to store all shapes for SVG creation
+    shapes = []
 
-    if circles is not None:
-        circles = np.uint16(np.around(circles))
-        for i in circles[0, :]:
-            cv2.circle(img, (i[0], i[1]), i[2], (0, 255, 0), 2)  # Draw the circle
+    # Detect shapes using contours
+    _, binary_img = cv2.threshold(binary_img, 127, 255, cv2.THRESH_BINARY_INV)
+    contours, _ = cv2.findContours(binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
-    # Detect polygons
-    contours, _ = cv2.findContours(binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    for contour in contours:
-        # Filter out very small contours
-        if cv2.contourArea(contour) < 100:  # Adjust this threshold as needed
+    print("\nShapes detected:")
+    for i, contour in enumerate(contours, 1):
+        area = cv2.contourArea(contour)
+        if area < 50:  # Filter out very small contours
             continue
             
-        approx = cv2.approxPolyDP(contour, 0.04 * cv2.arcLength(contour, True), True)
-        if len(approx) == 3:
-            cv2.drawContours(img, [approx], 0, (0, 0, 255), 2)  # Triangle
-        elif len(approx) == 4:
-            cv2.drawContours(img, [approx], 0, (255, 0, 0), 2)  # Quadrilateral
-        elif len(approx) == 5:
-            cv2.drawContours(img, [approx], 0, (255, 255, 0), 2)  # pentagon
-        else:
-            cv2.drawContours(img, [approx], 0, (255, 0, 255), 2)  # Other polygons or circles(if hough fails)
+        # Draw the contour
+        cv2.drawContours(img, [contour], 0, (0, 0, 0), 2)
+        
+        # Get shape information
+        x, y, w, h = cv2.boundingRect(contour)
+        print(f"Shape {i}: Area={area:.2f}, Position=({x}, {y}), Size={w}x{h}")
+        
+        # Store contour points for SVG
+        shapes.append({
+            'type': 'contour',
+            'points': [point[0] for point in contour]
+        })
+
+    # Create SVG file
+    output_svg = image_path.replace('.png', '.svg')
+    create_svg(shapes, preprocessor.width, preprocessor.height, output_svg)
+    print(f"\nSVG file created: {output_svg}")
 
     # Show results
     cv2.imshow("Detected Shapes", img)
@@ -83,5 +113,5 @@ def detect_shapes(image_path):
 
 # Example usage:
 if __name__ == "__main__":
-    image_path = "data/png/binary_Bp79-81.png"  # Updated path to use PNG files
+    image_path = "data/png/binary_Bp79-81.png"
     detect_shapes(image_path)
