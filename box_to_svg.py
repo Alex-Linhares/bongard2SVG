@@ -4,6 +4,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 import os
 import svgwrite
+from percentage_inside_contour import ContourAnalyzer
 
 SMALL_OBJECT_CONTOUR_AREA = 1000
 
@@ -22,27 +23,7 @@ class BoxToSVGConverter:
     def __init__(self, input_folder="boxes"):
         """Initialize with input folder path."""
         self.input_folder = Path(input_folder)
-
-def get_white_pixel_percentage(self, image, contour, threshold=230):
-    """
-    Calculates the percentage of pixels within a contour that are "almost white".
-
-    Args:
-        image (numpy.ndarray): The grayscale or binary image.
-        contour (numpy.ndarray): The contour.
-        threshold (int, optional): The minimum pixel value to be considered "almost white" (0-255).
-                                 Defaults to 240.
-
-    Returns:
-        float: The percentage of "almost white" pixels (0.0 to 1.0) within the contour.
-    """
-
-    mask = np.zeros(image.shape, dtype=np.uint8)
-    cv2.drawContours(mask, [contour], 0, 255, -1)
-    white_pixels = np.sum(image[mask == 255] >= threshold)
-    total_pixels = np.sum(mask == 255)
-    return float(white_pixels) / total_pixels if total_pixels > 0 else 0.0
-
+        self.analyzer = ContourAnalyzer()  # Create an instance of ContourAnalyzer
 
     def detect_shapes(self, image):
         # Convert to grayscale if needed
@@ -208,19 +189,19 @@ def get_white_pixel_percentage(self, image, contour, threshold=230):
 
             # Process each contour
             for contour in contours:
-                # Skip very small contours.  Why?
-                if cv2.contourArea(contour) < SMALL_OBJECT_CONTOUR_AREA and self.get_white_pixel_percentage(binary, contour) < 0.5:
-                   continue
+                # Use the ContourAnalyzer instead of the local method
+                if self.analyzer.get_white_pixel_percentage_in_contour(box_path, contour, threshold=230) < 0.65:
+                    continue
 
                 # Create a mask and check if the shape is filled
                 mask = np.zeros(binary.shape, dtype=np.uint8)
                 cv2.drawContours(mask, [contour], 0, 255, -1)
                 mean_val = cv2.mean(binary, mask=mask)[0] # this only considers the pixels where the mask is non-zero (i.e., inside the white filled shape drawn in the previous step).
-                is_filled = mean_val < 175  # If mean value is less than 127, the shape is filled (black)
+                is_filled = mean_val < 127  # If mean value is less than 127, the shape is filled (black)
                 # playing with the threshold to see if it works better.  Note that 375 makes the entire box black.
                 # is_filled = mean_val < 175 was the original threshold.
                 if is_filled:
-                    print(f"Filled shape detected with mean value {mean_val}, with white pixel percentage {self.get_white_pixel_percentage(binary, contour)}")
+                    print(f"Filled shape detected with mean value {mean_val}, with white pixel percentage {self.analyzer.get_white_pixel_percentage_in_contour(box_path, contour, threshold=230)}")
 
                 # Approximate the contour to detect shape type
                 epsilon = 0.04 * cv2.arcLength(contour, True)
