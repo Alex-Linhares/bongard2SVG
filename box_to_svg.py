@@ -6,7 +6,7 @@ import os
 import svgwrite
 
 class BoxToSVGConverter:
-    def __init__(self, input_folder="data/boxes"):
+    def __init__(self, input_folder="boxes"):
         """Initialize with input folder path."""
         self.input_folder = Path(input_folder)
         
