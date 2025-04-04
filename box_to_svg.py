@@ -5,6 +5,19 @@ import xml.etree.ElementTree as ET
 import os
 import svgwrite
 
+SMALL_OBJECT_CONTOUR_AREA = 1000
+
+"""commit message = Problems:  tiny objects are not being detected.  Solution:  increased the contour area threshold.
+                    small objects are being detected as filled, but they are not actually filled.
+                    Lines are not being detected as lines (area is too small?).
+                    detected shapes have a fine outer stroke and a fine inner stroke.
+                    
+                    
+                    TODO: Refactor extract method on lines 185 to 190 and 41-43 to use the new threshold.
+                          Refactor again to get the percentage of white pixels inside the shape to determine if it's filled.
+                    """
+
+
 class BoxToSVGConverter:
     def __init__(self, input_folder="boxes"):
         """Initialize with input folder path."""
@@ -28,8 +41,8 @@ class BoxToSVGConverter:
         
         shapes = []
         for i, contour in enumerate(contours):
-            # Skip very small contours
-            if cv2.contourArea(contour) < 10:
+            # Skip very small contours.  Why?
+            if cv2.contourArea(contour) < SMALL_OBJECT_CONTOUR_AREA:
                 continue
             
             # Get shape properties
@@ -67,10 +80,15 @@ class BoxToSVGConverter:
                 shape_type = 'polygon'
 
             # Check if the shape is filled by examining the pixel values inside the contour
-            mask = np.zeros(binary.shape, dtype=np.uint8)
-            cv2.drawContours(mask, [contour], 0, 255, -1)
+            # This is a hack to get the fill color.  It's not perfect, and it's failing when there are small things inside the shape.
+            mask = np.zeros(binary.shape, dtype=np.uint8) # Creates a completely black image (mask) the same size as binary
+            cv2.drawContours(mask, [contour], 0, 255, -1) # Draws the contour on the mask
             mean_val = cv2.mean(binary, mask=mask)[0]
-            is_filled = mean_val < 127  # If mean value is less than 127, the shape is filled (black)
+            is_filled = mean_val > 127  # If mean value is less than 127, the shape is filled (black)
+            # playing with the threshold to see if it works better
+            # is_filled = mean_val < 375    
+
+            '''prompt: on lines 71 to 74 you try to see if the shape is filled, but this fails if there's a small shaape inside it, can you see the entirety of the shape to determine if it's filled?'''
 
             # Get the points for the shape
             if shape_type == 'circle':
@@ -169,15 +187,17 @@ class BoxToSVGConverter:
 
             # Process each contour
             for contour in contours:
-                # Skip very small contours
-                if cv2.contourArea(contour) < 10:
-                    continue
+                # Skip very small contours.  Why?
+                if cv2.contourArea(contour) < SMALL_OBJECT_CONTOUR_AREA:
+                   continue
 
-                # Create a mask to check if the shape is filled
+                # Create a mask and check if the shape is filled
                 mask = np.zeros(binary.shape, dtype=np.uint8)
                 cv2.drawContours(mask, [contour], 0, 255, -1)
-                mean_val = cv2.mean(binary, mask=mask)[0]
-                is_filled = mean_val < 127  # If mean value is less than 127, the shape is filled (black)
+                mean_val = cv2.mean(binary, mask=mask)[0] # this only considers the pixels where the mask is non-zero (i.e., inside the white filled shape drawn in the previous step).
+                is_filled = mean_val < 175  # If mean value is less than 127, the shape is filled (black)
+                # playing with the threshold to see if it works better.  Note that 375 makes the entire box black.
+                # is_filled = mean_val < 175 was the original threshold.
 
                 # Approximate the contour to detect shape type
                 epsilon = 0.04 * cv2.arcLength(contour, True)
@@ -231,7 +251,7 @@ class BoxToSVGConverter:
     def process_all_boxes(self):
         """Process all box images in the input folder."""
         # Get all PNG files
-        box_files = list(self.input_folder.glob("*.png"))
+        box_files = list(self.input_folder.glob("BP*.png"))
         
         if not box_files:
             print(f"No PNG files found in {self.input_folder}")
