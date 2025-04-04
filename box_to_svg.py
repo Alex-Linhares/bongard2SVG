@@ -1,29 +1,25 @@
 import cv2
 import numpy as np
 from pathlib import Path
-import xml.etree.ElementTree as ET
 import os
 import svgwrite
 from percentage_inside_contour import ContourAnalyzer
-
-SMALL_OBJECT_CONTOUR_AREA = 1 # why are we filtering out small objects?
-
-"""commit message = Problems:  tiny objects are not being detected.  Solution:  increased the contour area threshold.
-                    small objects are being detected as filled, but they are not actually filled.
-                    Lines are not being detected as lines (area is too small?).
-                    detected shapes have a fine outer stroke and a fine inner stroke.
-                    
-                    
-                    TODO: Refactor extract method on lines 185 to 190 and 41-43 to use the new threshold.
-                          Refactor again to get the percentage of white pixels inside the shape to determine if it's filled.
-                    """
-
 
 class BoxToSVGConverter:
     def __init__(self, input_folder="boxes"):
         """Initialize with input folder path."""
         self.input_folder = Path(input_folder)
         self.analyzer = ContourAnalyzer()
+        
+    def is_similar_circle(self, x1, y1, r1, existing_circles, tolerance=0.35):
+        """Check if a circle is similar to any existing circles."""
+        for x2, y2, r2 in existing_circles:
+            # Check if centers are close
+            center_dist = np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+            # Check if one circle is inside the other and has similar radius
+            if center_dist < max(r1, r2) and abs(r1 - r2) / max(r1, r2) < tolerance:
+                return True
+        return False
         
     def process_box(self, box_path):
         """Process a single box image and convert it to SVG."""
@@ -58,13 +54,12 @@ class BoxToSVGConverter:
             # Add white background
             dwg.add(dwg.rect(insert=(0, 0), size=(width, height), fill='white'))
 
+            # Keep track of circles we've drawn
+            existing_circles = []
+
             # Process each contour
             for contour in contours:
-                # Filter out small contours
-                if cv2.contourArea(contour) < SMALL_OBJECT_CONTOUR_AREA:
-                    continue
-
-                # Use the ContourAnalyzer instead of the local method
+                # Use the ContourAnalyzer to check if this is a filled shape
                 if self.analyzer.get_white_pixel_percentage_in_contour(box_path, contour, threshold=230) < 0.65:
                     continue
 
@@ -93,12 +88,18 @@ class BoxToSVGConverter:
                 circularity = 4 * np.pi * area / (perimeter * perimeter)
                 
                 if circularity > 0.8 and num_vertices > 4:
-                    # Draw circle
+                    # Get circle parameters
                     (x, y), radius = cv2.minEnclosingCircle(contour)
-                    dwg.add(dwg.circle(center=(x, y), r=radius,
-                                     fill='black' if is_filled else 'none',
-                                     stroke='black',
-                                     stroke_width=5))
+                    
+                    # Check if we already have a similar circle
+                    if not self.is_similar_circle(x, y, radius, existing_circles):
+                        # Draw circle
+                        dwg.add(dwg.circle(center=(x, y), r=radius,
+                                         fill='black' if is_filled else 'none',
+                                         stroke='black',
+                                         stroke_width=5))
+                        # Remember this circle
+                        existing_circles.append((x, y, radius))
                 else:
                     # Draw polygon
                     path_data = 'M ' + ' L '.join([f'{x},{y}' for x, y in points]) + ' Z'
