@@ -20,6 +20,34 @@ class BoxToSVGConverter:
             if center_dist < max(r1, r2) and abs(r1 - r2) / max(r1, r2) < tolerance:
                 return True
         return False
+
+    def is_similar_polygon(self, points1, existing_polygons, tolerance=0.35):
+        """Check if a polygon is similar to any existing polygons."""
+        # Convert points to numpy array for easier computation
+        poly1 = np.array(points1)
+        center1 = np.mean(poly1, axis=0)
+        
+        for points2 in existing_polygons:
+            poly2 = np.array(points2)
+            center2 = np.mean(poly2, axis=0)
+            
+            # Check if centers are close
+            center_dist = np.sqrt(np.sum((center1 - center2) ** 2))
+            
+            # Get bounding boxes
+            x1, y1, w1, h1 = cv2.boundingRect(poly1.astype(np.float32))
+            x2, y2, w2, h2 = cv2.boundingRect(poly2.astype(np.float32))
+            
+            # Compare sizes
+            size1 = max(w1, h1)
+            size2 = max(w2, h2)
+            
+            # If centers are close and sizes are similar
+            if (center_dist < max(size1, size2) * tolerance and 
+                abs(size1 - size2) / max(size1, size2) < tolerance):
+                return True
+                
+        return False
         
     def process_box(self, box_path):
         """Process a single box image and convert it to SVG."""
@@ -54,8 +82,9 @@ class BoxToSVGConverter:
             # Add white background
             dwg.add(dwg.rect(insert=(0, 0), size=(width, height), fill='white'))
 
-            # Keep track of circles we've drawn
+            # Keep track of shapes we've drawn
             existing_circles = []
+            existing_polygons = []
 
             # Process each contour
             for contour in contours:
@@ -101,12 +130,16 @@ class BoxToSVGConverter:
                         # Remember this circle
                         existing_circles.append((x, y, radius))
                 else:
-                    # Draw polygon
-                    path_data = 'M ' + ' L '.join([f'{x},{y}' for x, y in points]) + ' Z'
-                    dwg.add(dwg.path(d=path_data,
-                                   fill='black' if is_filled else 'none',
-                                   stroke='black',
-                                   stroke_width=5))
+                    # Check if we already have a similar polygon
+                    if not self.is_similar_polygon(points, existing_polygons):
+                        # Draw polygon
+                        path_data = 'M ' + ' L '.join([f'{x},{y}' for x, y in points]) + ' Z'
+                        dwg.add(dwg.path(d=path_data,
+                                       fill='black' if is_filled else 'none',
+                                       stroke='black',
+                                       stroke_width=5))
+                        # Remember this polygon
+                        existing_polygons.append(points)
 
             # Save the SVG file
             dwg.save()
