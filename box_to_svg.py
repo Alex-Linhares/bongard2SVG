@@ -48,7 +48,86 @@ class BoxToSVGConverter:
                 return True
                 
         return False
+
+    def is_similar_line(self, points1, existing_lines, tolerance=0.35):
+        """Check if a line is similar to any existing lines."""
+        if len(points1) != 2:
+            return False
+            
+        start1, end1 = points1
+        length1 = np.sqrt((end1[0] - start1[0])**2 + (end1[1] - start1[1])**2)
         
+        for points2 in existing_lines:
+            if len(points2) != 2:
+                continue
+                
+            start2, end2 = points2
+            length2 = np.sqrt((end2[0] - start2[0])**2 + (end2[1] - start2[1])**2)
+            
+            # Check if lines have similar length
+            if abs(length1 - length2) / max(length1, length2) > tolerance:
+                continue
+                
+            # Check if endpoints are close
+            dist1 = min(
+                np.sqrt((start1[0] - start2[0])**2 + (start1[1] - start2[1])**2),
+                np.sqrt((start1[0] - end2[0])**2 + (start1[1] - end2[1])**2)
+            )
+            dist2 = min(
+                np.sqrt((end1[0] - start2[0])**2 + (end1[1] - start2[1])**2),
+                np.sqrt((end1[0] - end2[0])**2 + (end1[1] - end2[1])**2)
+            )
+            
+            if dist1 < length1 * tolerance and dist2 < length1 * tolerance:
+                return True
+                
+        return False
+
+    def is_line(self, contour, points):
+        """Check if a contour represents a line."""
+        # Calculate area and perimeter
+        area = cv2.contourArea(contour)
+        perimeter = cv2.arcLength(contour, True)
+        
+        # A line should have very small area but significant perimeter
+        # This gives us a high perimeter-to-area ratio
+        if area == 0:
+            return perimeter > 1  # If area is zero, just check if perimeter is significant
+        else:
+            perimeter_area_ratio = perimeter / area  # Higher for line-like shapes
+            # return perimeter_area_ratio > 400 and area < 100  # Thresholds can be adjusted
+            return perimeter_area_ratio > area 
+
+    def is_point_near_line(self, px, py, line_x1, line_y1, line_x2, line_y2, threshold=20):
+        """Check if a point is near a line segment."""
+        # Calculate distance from point to line segment
+        # Based on the formula for point-to-line-segment distance
+        line_length = np.sqrt((line_x2 - line_x1)**2 + (line_y2 - line_y1)**2)
+        if line_length == 0:
+            return np.sqrt((px - line_x1)**2 + (py - line_y1)**2) < threshold
+            
+        t = max(0, min(1, ((px - line_x1) * (line_x2 - line_x1) + 
+                          (py - line_y1) * (line_y2 - line_y1)) / (line_length**2)))
+        
+        proj_x = line_x1 + t * (line_x2 - line_x1)
+        proj_y = line_y1 + t * (line_y2 - line_y1)
+        
+        distance = np.sqrt((px - proj_x)**2 + (py - proj_y)**2)
+        return distance < threshold
+
+    def is_edge_near_any_line(self, x1, y1, x2, y2, existing_lines, threshold=20):
+        """Check if a polygon edge is too close to any existing line."""
+        # Check both endpoints of the edge against all existing lines
+        for line_points in existing_lines:
+            line_x1, line_y1 = line_points[0]
+            line_x2, line_y2 = line_points[1]
+            
+            # If both endpoints are near the line, this edge is probably duplicate
+            if (self.is_point_near_line(x1, y1, line_x1, line_y1, line_x2, line_y2, threshold) and
+                self.is_point_near_line(x2, y2, line_x1, line_y1, line_x2, line_y2, threshold)):
+                return True
+        return False
+
     def process_box(self, box_path):
         """Process a single box image and convert it to SVG."""
         try:
@@ -67,11 +146,8 @@ class BoxToSVGConverter:
             else:
                 gray = image
 
-            # Create binary image for contour detection
+            # Create binary image
             _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
-
-            # Find contours
-            contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
             # Create SVG file path
             svg_path = os.path.splitext(box_path)[0] + '.svg'
@@ -85,12 +161,74 @@ class BoxToSVGConverter:
             # Keep track of shapes we've drawn
             existing_circles = []
             existing_polygons = []
+            existing_lines = []
+            polygon_edges = []  # Keep track of all polygon edges
 
-            # Process each contour
+            # First find all polygon edges
+            contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
             for contour in contours:
-                # Use the ContourAnalyzer to check if this is a filled shape
+                # Skip contours that don't meet the white pixel percentage criteria
                 if self.analyzer.get_white_pixel_percentage_in_contour(box_path, contour, threshold=230) < 0.65:
                     continue
+
+                # Approximate the contour
+                epsilon = 0.04 * cv2.arcLength(contour, True)
+                approx = cv2.approxPolyDP(contour, epsilon, True)
+                
+                points = [(point[0][0], point[0][1]) for point in approx]
+
+                # Check if it's a circle
+                area = cv2.contourArea(contour)
+                perimeter = cv2.arcLength(contour, True)
+                circularity = 4 * np.pi * area / (perimeter * perimeter)
+                
+                if circularity <= 0.8 or len(points) <= 4:  # If not a circle
+                    # Add all edges of the polygon
+                    for i in range(len(points)):
+                        x1, y1 = points[i]
+                        x2, y2 = points[(i + 1) % len(points)]
+                        polygon_edges.append(((x1, y1), (x2, y2)))
+
+            # Now detect lines using Hough Transform
+            lines = cv2.HoughLinesP(
+                255 - binary,  # Invert image since we want to detect black lines
+                rho=1,
+                theta=np.pi/180,
+                threshold=80,
+                minLineLength=60,
+                maxLineGap=0
+            )
+
+            # Draw Hough lines that aren't near polygon edges
+            if lines is not None:
+                for line in lines:
+                    x1, y1, x2, y2 = line[0]
+                    points = [(x1, y1), (x2, y2)]
+                    
+                    # Skip if this line is near any polygon edge
+                    is_near_polygon = False
+                    for edge_start, edge_end in polygon_edges:
+                        if (self.is_point_near_line(x1, y1, edge_start[0], edge_start[1], edge_end[0], edge_end[1], threshold=20) and
+                            self.is_point_near_line(x2, y2, edge_start[0], edge_start[1], edge_end[0], edge_end[1], threshold=20)):
+                            is_near_polygon = True
+                            break
+                    
+                    if not is_near_polygon and not self.is_similar_line(points, existing_lines):
+                        path_data = f'M {x1},{y1} L {x2},{y2}'
+                        dwg.add(dwg.path(d=path_data,
+                                       fill='none',
+                                       stroke='black',
+                                       stroke_width=5))
+                        existing_lines.append(points)
+
+            # Process contours again to draw circles and polygons
+            for contour in contours:
+                if self.analyzer.get_white_pixel_percentage_in_contour(box_path, contour, threshold=230) < 0.65:
+                    continue
+
+                epsilon = 0.04 * cv2.arcLength(contour, True)
+                approx = cv2.approxPolyDP(contour, epsilon, True)
+                points = [(point[0][0], point[0][1]) for point in approx]
 
                 # Create a mask and check if the shape is filled
                 mask = np.zeros(binary.shape, dtype=np.uint8)
@@ -98,25 +236,12 @@ class BoxToSVGConverter:
                 mean_val = cv2.mean(binary, mask=mask)[0]
                 is_filled = mean_val < 127
 
-                # Approximate the contour to detect shape type
-                epsilon = 0.04 * cv2.arcLength(contour, True)
-                approx = cv2.approxPolyDP(contour, epsilon, True)
-                
-                # Convert points to SVG format
-                points = []
-                for point in approx:
-                    x, y = point[0]
-                    points.append((x, y))
-
-                # Determine shape type based on number of vertices
-                num_vertices = len(points)
-                
                 # Check if it's a circle
                 area = cv2.contourArea(contour)
                 perimeter = cv2.arcLength(contour, True)
                 circularity = 4 * np.pi * area / (perimeter * perimeter)
                 
-                if circularity > 0.8 and num_vertices > 4:
+                if circularity > 0.8 and len(points) > 4:
                     # Get circle parameters
                     (x, y), radius = cv2.minEnclosingCircle(contour)
                     
