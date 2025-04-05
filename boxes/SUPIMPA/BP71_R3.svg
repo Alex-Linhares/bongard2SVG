@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<svg baseProfile="full" height="219" style="background-color: transparent;" version="1.1" viewBox="0,0,261,219" width="261" xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink"><defs><style type="text/css"><![CDATA[
+                svg {
+                    shape-rendering: geometricPrecision;
+                    border: none;
+                    outline: none;
+                }
+                path, ellipse {
+                    vector-effect: non-scaling-stroke;
+                }
+            ]]></style></defs><ellipse cx="45.20640563964844" cy="177.83792114257812" fill="none" rx="22.160898208618164" ry="22.618988037109375" stroke="black" stroke-width="5" transform="rotate(76.02759552001953, 45.20640563964844, 177.83792114257812)" /><ellipse cx="139.62342834472656" cy="174.4587860107422" fill="none" rx="21.947834014892578" ry="22.53112030029297" stroke="black" stroke-width="5" transform="rotate(117.70991516113281, 139.62342834472656, 174.4587860107422)" /><path d="M 202,119 L 189,146 L 222,146 L 206,120 Z" fill="none" stroke="black" stroke-width="5" /><path d="M 57,65 L 55,67 L 53,67 L 53,68 L 50,71 L 49,74 L 51,77 L 51,79 L 55,81 L 60,81 L 66,76 L 66,71 L 64,67 L 63,67 L 61,65 Z" fill="none" stroke="black" stroke-width="5" /><path d="M 17,103 L 102,93 L 54,29 Z" fill="none" stroke="black" stroke-width="5" /><path d="M 183,25 L 183,48 L 203,47 L 203,26 L 201,24 Z" fill="none" stroke="black" stroke-width="5" /></svg>

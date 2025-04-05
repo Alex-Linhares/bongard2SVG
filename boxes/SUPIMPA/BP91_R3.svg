@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<svg baseProfile="full" height="221" style="background-color: transparent;" version="1.1" viewBox="0,0,260,221" width="260" xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink"><defs><style type="text/css"><![CDATA[
+                svg {
+                    shape-rendering: geometricPrecision;
+                    border: none;
+                    outline: none;
+                }
+                path, ellipse {
+                    vector-effect: non-scaling-stroke;
+                }
+            ]]></style></defs><ellipse cx="175.94635009765625" cy="186.48338317871094" fill="none" rx="19.750381469726562" ry="20.12693214416504" stroke="black" stroke-width="5" transform="rotate(80.84332275390625, 175.94635009765625, 186.48338317871094)" /><ellipse cx="80.53848266601562" cy="152.24009704589844" fill="none" rx="19.88079071044922" ry="20.691083908081055" stroke="black" stroke-width="5" transform="rotate(50.85258102416992, 80.53848266601562, 152.24009704589844)" /><ellipse cx="196.80433654785156" cy="105.56041717529297" fill="none" rx="19.387222290039062" ry="20.019126892089844" stroke="black" stroke-width="5" transform="rotate(90.7907943725586, 196.80433654785156, 105.56041717529297)" /><ellipse cx="98.06622314453125" cy="55.30207061767578" fill="none" rx="19.797029495239258" ry="20.250499725341797" stroke="black" stroke-width="5" transform="rotate(74.18006896972656, 98.06622314453125, 55.30207061767578)" /></svg>

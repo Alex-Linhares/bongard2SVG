@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   height="220"
+   style="background-color: transparent;"
+   version="1.1"
+   viewBox="0,0,255,220"
+   width="255"
+   id="svg10"
+   sodipodi:docname="BP34_R2.svg"
+   inkscape:version="1.2.1 (9c6d41e, 2022-07-14)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview12"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="1.0727273"
+     inkscape:cx="75.508475"
+     inkscape:cy="110"
+     inkscape:window-width="1309"
+     inkscape:window-height="456"
+     inkscape:window-x="0"
+     inkscape:window-y="39"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg10" />
+  <defs
+     id="defs4">
+    <style
+       type="text/css"
+       id="style2"><![CDATA[
+                svg {
+                    shape-rendering: geometricPrecision;
+                    border: none;
+                    outline: none;
+                }
+                path, ellipse {
+                    vector-effect: non-scaling-stroke;
+                }
+            ]]></style>
+  </defs>
+  <ellipse
+     cx="150.11505126953125"
+     cy="117.18923950195312"
+     fill="none"
+     rx="77.7491226196289"
+     ry="78.13326263427734"
+     stroke="black"
+     stroke-width="5"
+     transform="rotate(107.06090545654297, 150.11505126953125, 117.18923950195312)"
+     id="ellipse8"
+     style="fill:#000000" />
+  <path
+     d="M 139,129 L 170,123 L 171,120 L 144,108 Z"
+     fill="none"
+     stroke="black"
+     stroke-width="5"
+     id="path6"
+     style="fill:#ffffff" />
+</svg>

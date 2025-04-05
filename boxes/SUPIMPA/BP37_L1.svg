@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<svg baseProfile="full" height="216" style="background-color: transparent;" version="1.1" viewBox="0,0,261,216" width="261" xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink"><defs><style type="text/css"><![CDATA[
+                svg {
+                    shape-rendering: geometricPrecision;
+                    border: none;
+                    outline: none;
+                }
+                path, ellipse {
+                    vector-effect: non-scaling-stroke;
+                }
+            ]]></style></defs><path d="M 92,170 L 93,192 L 118,192 L 116,170 Z" fill="none" stroke="black" stroke-width="5" /><path d="M 195,121 L 185,129 L 181,148 L 189,160 L 211,164 L 226,148 L 224,132 L 212,121 Z" fill="none" stroke="black" stroke-width="5" /><path d="M 82,110 L 82,113 L 117,112 L 99,86 Z" fill="none" stroke="black" stroke-width="5" /></svg>

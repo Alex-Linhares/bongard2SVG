@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   height="220"
+   style="background-color: transparent;"
+   version="1.1"
+   viewBox="0,0,259,220"
+   width="259"
+   id="svg12"
+   sodipodi:docname="BP1_R6.svg"
+   inkscape:version="1.2.1 (9c6d41e, 2022-07-14)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview14"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="1.0727273"
+     inkscape:cx="176.65254"
+     inkscape:cy="110.4661"
+     inkscape:window-width="1710"
+     inkscape:window-height="1069"
+     inkscape:window-x="0"
+     inkscape:window-y="38"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg12" />
+  <defs
+     id="defs4">
+    <style
+       type="text/css"
+       id="style2"><![CDATA[
+                svg {
+                    shape-rendering: geometricPrecision;
+                    border: none;
+                    outline: none;
+                }
+                path, ellipse {
+                    vector-effect: non-scaling-stroke;
+                }
+            ]]></style>
+  </defs>
+  <path
+     d="M 119,177 L 103,154 L 86,180 Z"
+     fill="none"
+     stroke="black"
+     stroke-width="5"
+     id="path6" />
+  <path
+     d="M 163,70 L 163,99 L 191,99 L 192,70 Z"
+     fill="none"
+     stroke="black"
+     stroke-width="5"
+     id="path8" />
+  <ellipse
+     cx="88.259583"
+     cy="40.59726"
+     fill="none"
+     rx="18.681503"
+     ry="18.418613"
+     stroke="#000000"
+     stroke-width="1.474"
+     transform="matrix(0.9295454,0.36870768,-0.39053989,0.92058601,0,0)"
+     id="ellipse124"
+     style="stroke-width:5.00069629;stroke-dasharray:none" />
+</svg>

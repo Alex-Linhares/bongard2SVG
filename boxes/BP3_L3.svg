@@ -1,2 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<svg baseProfile="full" height="224" version="1.1" width="260" xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink"><defs /><rect fill="white" height="224" width="260" x="0" y="0" /><path d="M 58,98 L 50,106 L 50,117 L 56,123 L 66,125 L 75,118 L 75,105 L 67,98 Z" fill="none" stroke="black" stroke-width="5" /><path d="M 0,0 L 0,223 L 259,223 L 259,0 Z" fill="none" stroke="black" stroke-width="5" /></svg>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink" baseProfile="full" height="224" version="1.1" width="260">
+  <defs/>
+  <path d="M 52.364481,128.920853 C 49.916891,127.491383 46.601884,124.786908 44.997799,122.910908 C 42.331018,119.792071 42.083486,118.857787 42.107031,112.000000 C 42.130529,105.155966 42.414654,104.112023 45.355586,100.064059 C 50.842154,92.512226 59.769775,89.035632 68.344028,91.111900 C 78.676769,93.613989 84.237423,100.691470 84.080066,111.140393 C 83.831583,127.640305 66.657545,137.268451 52.364481,128.920853" fill="none" stroke="black" stroke-width="5"/>
+</svg>

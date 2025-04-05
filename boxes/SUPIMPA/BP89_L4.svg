@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<svg baseProfile="full" height="221" style="background-color: transparent;" version="1.1" viewBox="0,0,260,221" width="260" xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink"><defs><style type="text/css"><![CDATA[
+                svg {
+                    shape-rendering: geometricPrecision;
+                    border: none;
+                    outline: none;
+                }
+                path, ellipse {
+                    vector-effect: non-scaling-stroke;
+                }
+            ]]></style></defs><path d="M 159,156 L 151,157 L 146,165 L 146,173 L 148,177 L 146,194 L 147,197 L 154,202 L 161,200 L 165,191 L 165,177 L 167,169 L 165,166 L 165,161 Z" fill="none" stroke="black" stroke-width="5" /><path d="M 129,156 L 122,161 L 120,190 L 124,200 L 134,202 L 139,194 L 140,169 L 137,159 Z" fill="none" stroke="black" stroke-width="5" /><path d="M 157,77 L 152,81 L 150,101 L 154,118 L 161,122 L 171,114 L 171,86 L 169,81 Z" fill="none" stroke="black" stroke-width="5" /><path d="M 186,76 L 178,81 L 176,98 L 180,116 L 189,120 L 195,116 L 197,99 L 195,83 Z" fill="none" stroke="black" stroke-width="5" /><path d="M 208,75 L 202,82 L 204,115 L 216,119 L 223,106 L 222,83 L 219,77 Z" fill="none" stroke="black" stroke-width="5" /><path d="M 88,32 L 80,36 L 78,44 L 82,72 L 91,77 L 101,67 L 97,36 Z" fill="none" stroke="black" stroke-width="5" /><path d="M 60,32 L 52,39 L 52,55 L 56,74 L 66,78 L 75,67 L 73,45 L 69,35 Z" fill="none" stroke="black" stroke-width="5" /></svg>
