@@ -22,8 +22,8 @@ Here are some examples of the conversion results:
 
 | Input PNG | Output SVG | Description |
 |:---:|:---:|:---|
-| ![Line Example](boxes/BP13_R5.png) | ![Line SVG](boxes/BP13_R5.svg) | Simple line drawing |
-| ![Shape Example](boxes/BP15_L4.png) | ![Shape SVG](boxes/BP15_L4.svg) | Mixed shapes |
+| ![Line Example](boxes/BP10_R2.png) | ![Line SVG](boxes/BP10_R2.svg) | Simple line drawing |
+| ![Shape Example](boxes/BP15_R3.png) | ![Shape SVG](boxes/BP15_R3.svg) | Mixed shapes |
 | ![Complex Example](boxes/BP21_L1.png) | ![Complex SVG](boxes/BP21_L1.svg) | Complex pattern |
 
 The converter intelligently:
