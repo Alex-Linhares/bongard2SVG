@@ -1,128 +1,92 @@
-# Box to SVG Converter
+# Bongard2SVG
 
-A Python module for converting Bongard Problem box images to SVG format, with accurate shape detection and representation.
+A Python tool for converting Bongard Problem box images to SVG format, with intelligent shape detection and vectorization.
 
 ## Features
 
-- Converts PNG images to SVG format
-- Detects and classifies different shapes:
-  - Triangles
-  - Squares
-  - Rectangles
-  - Circles
-  - Polygons
-- Preserves shape properties:
-  - Fill (solid or outline)
-  - Dimensions
-  - Position
-- Handles multiple files in batch processing
-- Maintains original image dimensions
-- Supports shape analysis for complex patterns
+- Converts PNG images to clean SVG vector graphics
+- Intelligent shape detection:
+  - Automatically detects circles and triangles
+  - Distinguishes between lines and filled shapes
+  - Handles nested shapes correctly
+- Maintains visual fidelity:
+  - Preserves line thickness
+  - Correctly handles filled vs outlined shapes
+  - Maintains original image dimensions
+- Batch processing support for multiple files
+
+## Examples
+
+### Line and Shape Examples
+Here are some examples of the conversion results:
+
+| Input PNG | Output SVG | Description |
+|:---:|:---:|:---|
+| ![Line Example](boxes/BP13_R5.png) | ![Line SVG](boxes/BP13_R5.svg) | Simple line drawing |
+| ![Shape Example](boxes/BP15_L4.png) | ![Shape SVG](boxes/BP15_L4.svg) | Mixed shapes |
+| ![Complex Example](boxes/BP21_L1.png) | ![Complex SVG](boxes/BP21_L1.svg) | Complex pattern |
+
+The converter intelligently:
+- Detects and preserves line drawings without filling
+- Identifies and maintains filled shapes
+- Handles complex patterns with mixed elements
 
 ## Dependencies
 
-- OpenCV (cv2)
-- NumPy
-- svgwrite
-- pathlib
-- xml.etree.ElementTree
-- percentage_inside_contour (local module)
-
-## Installation
-
-1. Ensure you have the required dependencies:
 ```bash
-pip install opencv-python numpy svgwrite
+pip install pillow numpy svgwrite pypotrace
+brew install potrace  # For macOS
 ```
-
-2. Clone this repository or copy the following files to your project:
-   - `box_to_svg.py`
-   - `percentage_inside_contour.py`
 
 ## Usage
 
-### Basic Usage
-
+1. Place your PNG images in a `boxes` directory
+2. Run the converter:
 ```python
-from box_to_svg import BoxToSVGConverter
-
-# Create converter instance
-converter = BoxToSVGConverter(input_folder="boxes")
-
-# Process all boxes in the input folder
-converter.process_all_boxes()
+python image_to_svg.py
 ```
 
-### Directory Structure
-project/
-├── boxes/ # Input folder containing PNG files
-│ ├── BP1_L1.png
-│ ├── BP1_L2.png
-│ └── ...
-├── box_to_svg.py
-└── percentage_inside_contour.py
+The script will process all PNG files in the `boxes` directory and create corresponding SVG files.
 
+## How it Works
 
-### Configuration
+The converter uses several sophisticated algorithms:
 
-The module has several configurable parameters:
+1. **Shape Analysis**
+   - Area/perimeter ratio analysis for line detection
+   - Radius variance calculation for circle detection
+   - Triangle detection using corner analysis
+   - Nested shape detection to avoid double tracing
 
-- `SMALL_OBJECT_CONTOUR_AREA`: Minimum area threshold for detecting shapes (default: 1000)
-- Input folder path can be specified in the constructor
-- Thresholds for shape detection and fill analysis can be adjusted in the code
+2. **Fill Detection**
+   - Black pixel ratio analysis
+   - Size-based thresholds:
+     - Small objects (< 500px²): 90% black required
+     - Large objects: 85% black required
+   - Special handling for geometric shapes
 
-## Methods
+3. **Path Generation**
+   - Bezier curve preservation
+   - Automatic path closure handling
+   - Stroke width adjustment based on shape type
 
-### BoxToSVGConverter
+## Parameters
 
-#### __init__(input_folder="boxes")
-Initializes the converter with the specified input folder.
-
-#### process_box(box_path)
-Processes a single box image and converts it to SVG.
-
-#### process_all_boxes()
-Processes all PNG files in the input folder that match the pattern "BP*.png".
-
-## Shape Detection
-
-The module detects shapes based on the following criteria:
-
-- Triangles: 3 vertices
-- Squares: 4 vertices with aspect ratio between 0.95 and 1.05
-- Rectangles: 4 vertices with other aspect ratios
-- Circles: More than 8 vertices and high circularity
-- Polygons: Other shapes
-
-## Fill Detection
-
-Shape fill detection uses two approaches:
-1. Mean pixel value analysis within the contour
-2. White pixel percentage calculation (using percentage_inside_contour module)
-
-## Output
-
-- SVG files are created with the same name as the input PNG files
-- Each SVG contains:
-  - White background
-  - Detected shapes with appropriate fill and stroke
-  - Original image dimensions
-
-## Example
+Key parameters that affect the conversion:
 
 ```python
-# Example with custom input folder
-converter = BoxToSVGConverter(input_folder="custom_boxes")
-converter.process_all_boxes()
+# Size thresholds
+MIN_AREA = 100  # Minimum area to process
+SMALL_OBJECT_THRESHOLD = 500  # Threshold for strict fill criteria
+SHAPE_DETECTION_THRESHOLD = 1000  # Threshold for shape detection
+
+# Fill criteria
+SMALL_OBJECT_FILL_RATIO = 0.9  # Black pixel ratio for small objects
+LARGE_OBJECT_FILL_RATIO = 0.85  # Black pixel ratio for large objects
+
+# Line detection
+AREA_PERIMETER_RATIO = 5  # Threshold for line detection
 ```
-
-## Notes
-
-- Input images should be clear, binary-like images
-- Small shapes and noise are filtered based on area threshold
-- Shape detection parameters can be tuned for specific use cases
-- The module handles both filled and outlined shapes
-- Error handling is implemented for robustness
 
 ## Contributing
 
