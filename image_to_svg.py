@@ -49,6 +49,68 @@ def is_path_nested(curve1, curve2):
             y1 >= Y1 - margin and y2 <= Y2 + margin and
             (x1 > X1 or x2 < X2 or y1 > Y1 or y2 < Y2))  # At least one bound must be strictly inside
 
+def is_circle_like(points, area):
+    """Check if a path resembles a circle."""
+    # Get centroid
+    cx = sum(p[0] for p in points) / len(points)
+    cy = sum(p[1] for p in points) / len(points)
+    
+    # Calculate average radius and variance
+    radii = [(((p[0] - cx) ** 2 + (p[1] - cy) ** 2) ** 0.5) for p in points]
+    avg_radius = sum(radii) / len(radii)
+    variance = sum((r - avg_radius) ** 2 for r in radii) / len(radii)
+    
+    # Circle should have low radius variance relative to its size
+    return variance / avg_radius < 0.2
+
+def is_triangle_like(points):
+    """Check if a path resembles a triangle."""
+    if len(points) < 3:
+        return False
+        
+    # Get three points with maximum distance between them
+    max_dist = 0
+    corners = []
+    for i in range(len(points)):
+        for j in range(i + 1, len(points)):
+            dist = ((points[i][0] - points[j][0]) ** 2 + 
+                   (points[i][1] - points[j][1]) ** 2)
+            if dist > max_dist:
+                max_dist = dist
+                corners = [points[i], points[j]]
+    
+    # Find third point with maximum distance from line
+    max_dist = 0
+    for p in points:
+        if p not in corners:
+            # Distance from point to line
+            x0, y0 = p
+            x1, y1 = corners[0]
+            x2, y2 = corners[1]
+            dist = abs((y2-y1)*x0 - (x2-x1)*y0 + x2*y1 - y2*x1) / ((y2-y1)**2 + (x2-x1)**2)**0.5
+            if dist > max_dist:
+                max_dist = dist
+                corners.append(p)
+    
+    if len(corners) < 3:
+        return False
+        
+    # Check if other points are close to the triangle edges
+    for p in points:
+        if p in corners:
+            continue
+        # Calculate minimum distance to any edge
+        min_dist = float('inf')
+        for i in range(3):
+            x1, y1 = corners[i]
+            x2, y2 = corners[(i + 1) % 3]
+            dist = abs((y2-y1)*p[0] - (x2-x1)*p[1] + x2*y1 - y2*x1) / ((y2-y1)**2 + (x2-x1)**2)**0.5
+            min_dist = min(min_dist, dist)
+        if min_dist > 5:  # Allow some deviation from perfect triangle
+            return False
+            
+    return True
+
 def should_fill_path(curve, img_array):
     """Check if a path should be filled by analyzing the original image."""
     # Create a mask image
@@ -72,17 +134,33 @@ def should_fill_path(curve, img_array):
     draw.polygon(points, fill=1)
     mask_array = np.array(mask)
     
-    # Check if the path is thin (like a line) by comparing area to perimeter
+    # Calculate area and perimeter
     area = np.sum(mask_array)
     perimeter = len(points)  # Approximate perimeter using number of points
-    if area / perimeter < 3:  # Threshold for thin shapes
+    
+    # Don't fill if object is too small (likely noise or small details)
+    if area < 100:  # Minimum area threshold
         return False
+        
+    # Don't fill if object is thin (like a line)
+    if area / perimeter < 5:  # Increased threshold for better line detection
+        return False
+    
+    # For small objects, check if they're circles or triangles
+    if area < 1000:
+        # Never fill small circles or triangles
+        if is_circle_like(points, area) or is_triangle_like(points):
+            return False
     
     # Check if the original image has black pixels inside the path
     inside_pixels = img_array[mask_array > 0]
     black_ratio = np.sum(inside_pixels <= 128) / len(inside_pixels)
     
-    return black_ratio > 0.5  # If more than 50% of pixels are black, fill the path
+    # More strict fill criteria for small objects
+    if area < 500:  # For small objects
+        return black_ratio > 0.9  # Even higher black ratio for small objects
+    
+    return black_ratio > 0.7  # Normal threshold for larger objects
 
 def image_to_svg(input_image, output_file):
     img = Image.open(input_image).convert("L")  # Grayscale
