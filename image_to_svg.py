@@ -160,7 +160,7 @@ def should_fill_path(curve, img_array):
     if area < 500:  # For small objects
         return black_ratio > 0.9  # Even higher black ratio for small objects
     
-    return black_ratio > 0.7  # Normal threshold for larger objects
+    return black_ratio > 0.85  # Threshold for larger objects
 
 def image_to_svg(input_image, output_file):
     img = Image.open(input_image).convert("L")  # Grayscale
