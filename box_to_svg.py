@@ -381,18 +381,55 @@ class BoxToSVGConverter:
             # Create SVG file path
             svg_path = os.path.splitext(box_path)[0] + '.svg'
 
-            # Create SVG with original dimensions
-            dwg = svgwrite.Drawing(svg_path, size=(width, height))
-
-            # Add white background
-            dwg.add(dwg.rect(insert=(0, 0), size=(width, height), fill='white'))
+            # Create SVG with original dimensions and no default border
+            dwg = svgwrite.Drawing(svg_path, size=(width, height), style='background-color: transparent;')
+            dwg.viewbox(minx=0, miny=0, width=width, height=height)
+            
+            # Add a style to ensure no default borders
+            dwg.defs.add(dwg.style("""
+                svg {
+                    shape-rendering: geometricPrecision;
+                    border: none;
+                    outline: none;
+                }
+                path, ellipse {
+                    vector-effect: non-scaling-stroke;
+                }
+            """))
 
             # Find all contours first
             contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
             
-            # Filter contours by white pixel percentage
+            # Filter contours by white pixel percentage and check if they touch borders
             valid_contours = []
             for contour in contours:
+                # Skip contours that form a rectangle around the entire image
+                x, y, w, h = cv2.boundingRect(contour)
+                is_border_rectangle = (
+                    abs(x) <= 5 and abs(y) <= 5 and  # Close to top-left corner
+                    abs(w - width) <= 10 and abs(h - height) <= 10  # Close to image dimensions
+                )
+                if is_border_rectangle:
+                    continue
+
+                # Check if contour touches image border
+                touches_border = (x <= 0 or y <= 0 or x + w >= width or y + h >= height)
+                
+                # If it touches border, expand the points slightly inward
+                if touches_border:
+                    # Create a slightly smaller bounding box
+                    margin = 2
+                    new_x = max(0, x)
+                    new_y = max(0, y)
+                    new_w = min(width - new_x, w)
+                    new_h = min(height - new_y, h)
+                    
+                    # Adjust contour points to stay within bounds
+                    contour = contour.reshape(-1, 2)
+                    contour[:, 0] = np.clip(contour[:, 0], margin, width - margin)
+                    contour[:, 1] = np.clip(contour[:, 1], margin, height - margin)
+                    contour = contour.reshape(-1, 1, 2)
+
                 if self.analyzer.get_white_pixel_percentage_in_contour(box_path, contour, threshold=230) >= 0.65:
                     valid_contours.append(contour)
 
