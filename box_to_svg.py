@@ -11,6 +11,11 @@ class BoxToSVGConverter:
         self.input_folder = Path(input_folder)
         self.analyzer = ContourAnalyzer()
         
+        # Create input folder if it doesn't exist
+        if not self.input_folder.exists():
+            print(f"Creating input folder: {self.input_folder}")
+            self.input_folder.mkdir(parents=True, exist_ok=True)
+        
     def is_similar_polygon(self, points1, existing_polygons, tolerance=0.35):
         """Check if a polygon is similar to any existing polygons."""
         # Convert points to numpy array for easier computation
@@ -289,82 +294,162 @@ class BoxToSVGConverter:
             return False
             
         try:
-            # Fit an ellipse
+            # Calculate basic shape metrics
+            area = cv2.contourArea(contour)
+            perimeter = cv2.arcLength(contour, True)
+            if perimeter == 0:
+                return False
+                
+            # Calculate circularity (1.0 = perfect circle)
+            circularity = 4 * np.pi * area / (perimeter * perimeter)
+            
+            # Get bounding box and calculate aspect ratio
+            x, y, w, h = cv2.boundingRect(contour)
+            aspect_ratio = float(w)/h if h > 0 else 0
+            
+            # Calculate solidity
+            hull = cv2.convexHull(contour)
+            hull_area = cv2.contourArea(hull)
+            if hull_area == 0:
+                return False
+            solidity = float(area)/hull_area
+            
+            # Calculate extent (area to bounding box ratio)
+            extent = float(area)/(w*h) if w*h > 0 else 0
+            
+            # Fit an ellipse and get its parameters
             ellipse = cv2.fitEllipse(contour)
             center, axes, angle = ellipse
             
-            # Create masks for comparison
-            h, w = cv2.boundingRect(contour)[2:]
-            mask_size = (h + 20, w + 20)  # Add padding
+            # Calculate axes ratio
+            axes_ratio = max(axes) / min(axes) if min(axes) > 0 else float('inf')
             
-            # Draw the original contour
-            contour_mask = np.zeros(mask_size, dtype=np.uint8)
-            shifted_contour = contour.copy()
-            shifted_contour = shifted_contour.reshape(-1, 2)
-            shifted_contour[:, 0] += 10  # Shift to account for padding
-            shifted_contour[:, 1] += 10
-            shifted_contour = shifted_contour.reshape(-1, 1, 2)
-            cv2.drawContours(contour_mask, [shifted_contour], 0, 255, -1)
+            # Print debug info
+            print(f"  Shape Analysis:")
+            print(f"    Area: {area:.1f}")
+            print(f"    Circularity: {circularity:.3f}")
+            print(f"    Aspect ratio: {aspect_ratio:.3f}")
+            print(f"    Solidity: {solidity:.3f}")
+            print(f"    Extent: {extent:.3f}")
+            print(f"    Axes ratio: {axes_ratio:.3f}")
             
-            # Draw the fitted ellipse
-            ellipse_mask = np.zeros(mask_size, dtype=np.uint8)
-            center = (center[0] + 10, center[1] + 10)  # Shift center too
-            cv2.ellipse(ellipse_mask, 
-                       [int(center[0]), int(center[1])],
-                       [int(axes[0]/2), int(axes[1]/2)],
-                       angle, 0, 360, 255, -1)
+            # Different criteria based on size
+            if area < 1000:  # Small shapes
+                # Stricter criteria for small shapes
+                is_ellipse = (
+                    circularity > 0.85 and  # Very circular
+                    0.8 < aspect_ratio < 1.2 and  # Nearly square bounding box
+                    solidity > 0.92 and  # Very solid
+                    extent > 0.7 and  # Fills bounding box well
+                    axes_ratio < 1.3  # Nearly equal axes
+                )
+            else:  # Large shapes
+                # Much more lenient criteria for large shapes
+                is_ellipse = (
+                    circularity > 0.65 and  # Much less strict circularity
+                    0.5 < aspect_ratio < 2.0 and  # Allow more elongated shapes
+                    solidity > 0.8 and  # Allow less solid shapes
+                    extent > 0.55 and  # Allow less filling
+                    axes_ratio < 2.0  # Allow more elongated ellipses
+                )
             
-            # Calculate overlap and areas
-            overlap = cv2.bitwise_and(contour_mask, ellipse_mask)
-            overlap_area = cv2.countNonZero(overlap)
-            ellipse_area = cv2.countNonZero(ellipse_mask)
-            contour_area = cv2.countNonZero(contour_mask)
+            print(f"    Classified as: {'ellipse' if is_ellipse else 'not ellipse'}")
+            return is_ellipse
             
-            # Calculate fit quality
-            fit_quality = overlap_area / max(ellipse_area, contour_area)
-            
-            # Calculate perimeter efficiency (closer to 1 for ellipses)
-            contour_perimeter = cv2.arcLength(contour, True)
-            theoretical_ellipse_perimeter = np.pi * (axes[0] + axes[1]) / 2
-            perimeter_ratio = min(contour_perimeter, theoretical_ellipse_perimeter) / max(contour_perimeter, theoretical_ellipse_perimeter)
-            
-            # Check contour smoothness
-            angles = []
-            for i in range(len(contour)):
-                p1 = contour[i][0]
-                p2 = contour[(i + 1) % len(contour)][0]
-                p3 = contour[(i + 2) % len(contour)][0]
-                
-                v1 = p2 - p1
-                v2 = p3 - p2
-                
-                dot = np.dot(v1, v2)
-                norms = np.linalg.norm(v1) * np.linalg.norm(v2)
-                
-                if norms > 0:
-                    cos_angle = dot / norms
-                    cos_angle = min(1.0, max(-1.0, cos_angle))
-                    angle = np.arccos(cos_angle)
-                    angles.append(angle)
-            
-            angle_std = np.std(angles)
-            
-            # Return True only if all criteria are met
-            return (fit_quality > 0.9 and  # Very high fit quality
-                    perimeter_ratio > 0.85 and  # Efficient perimeter
-                    angle_std < 0.5)  # Smooth angle changes
-                    
-        except:
+        except Exception as e:
+            print(f"Error in ellipse check: {str(e)}")
             return False
+
+    def is_square_like(self, contour):
+        """Check if a contour is likely to be a square or rectangle."""
+        # Get the basic metrics
+        area = cv2.contourArea(contour)
+        perimeter = cv2.arcLength(contour, True)
+        if perimeter == 0:
+            return False
+            
+        # Get approximated polygon
+        epsilon = 0.02 * perimeter
+        approx = cv2.approxPolyDP(contour, epsilon, True)
+        points = [(point[0][0], point[0][1]) for point in approx]
+        
+        # Must have 4 points for a square/rectangle
+        if len(points) != 4:
+            return False
+            
+        # Calculate angles between sides
+        angles = []
+        for i in range(4):
+            p1 = np.array(points[i])
+            p2 = np.array(points[(i + 1) % 4])
+            p3 = np.array(points[(i + 2) % 4])
+            
+            # Calculate vectors
+            v1 = p2 - p1
+            v2 = p3 - p2
+            
+            # Calculate angle
+            dot = np.dot(v1, v2)
+            norm = np.linalg.norm(v1) * np.linalg.norm(v2)
+            if norm == 0:
+                return False
+            cos_angle = dot / norm
+            angle = np.abs(np.arccos(cos_angle) * 180 / np.pi)
+            angles.append(angle)
+        
+        # Check if angles are close to 90 degrees
+        is_rectangular = all(abs(angle - 90) < 15 for angle in angles)
+        
+        # Get bounding box properties
+        x, y, w, h = cv2.boundingRect(contour)
+        aspect_ratio = float(w)/h if h > 0 else 0
+        if aspect_ratio < 1:
+            aspect_ratio = 1/aspect_ratio
+            
+        # Calculate how well the contour fills its bounding box
+        extent = float(area)/(w*h) if w*h > 0 else 0
+        
+        # Calculate solidity
+        hull = cv2.convexHull(contour)
+        hull_area = cv2.contourArea(hull)
+        solidity = float(area)/hull_area if hull_area > 0 else 0
+        
+        print(f"  Square Analysis:")
+        print(f"    Angles: {[round(a, 1) for a in angles]}")
+        print(f"    Aspect ratio: {aspect_ratio:.3f}")
+        print(f"    Extent: {extent:.3f}")
+        print(f"    Solidity: {solidity:.3f}")
+        
+        # Criteria for being square-like:
+        is_square = (
+            is_rectangular and  # Angles close to 90 degrees
+            aspect_ratio < 2.0 and  # Not too elongated
+            extent > 0.8 and  # Fills bounding box well
+            solidity > 0.85  # Very solid shape
+        )
+        
+        print(f"    Is square-like: {is_square}")
+        return is_square
 
     def process_box(self, box_path):
         """Process a single box image and convert it to SVG."""
         try:
+            # Check if input file exists
+            if not os.path.exists(box_path):
+                print(f"Error: Input file not found: {box_path}")
+                return
+
             # Read the image
-            image = cv2.imread(box_path)
+            image = cv2.imread(str(box_path))
             if image is None:
                 print(f"Error: Could not read image {box_path}")
                 return
+
+            # Create output directory if it doesn't exist
+            output_dir = os.path.dirname(box_path)
+            if not os.path.exists(output_dir):
+                print(f"Creating output directory: {output_dir}")
+                os.makedirs(output_dir, exist_ok=True)
 
             # Get original image dimensions
             height, width = image.shape[:2]
@@ -438,35 +523,90 @@ class BoxToSVGConverter:
             shapes_to_draw = []  # Will store tuples of (shape_type, parameters)
 
             for contour in valid_contours:
-                # First check if the contour is truly elliptical
-                if self.is_elliptical(contour):
-                    ellipse = cv2.fitEllipse(contour)
-                    center, axes, angle = ellipse
-                    
-                    # Check if the shape is filled
-                    mask = np.zeros(binary.shape, dtype=np.uint8)
-                    cv2.drawContours(mask, [contour], 0, 255, -1)
-                    mean_val = cv2.mean(binary, mask=mask)[0]
-                    is_filled = mean_val < 127
-                    
-                    shapes_to_draw.append(('ellipse', (center, axes, angle, is_filled)))
-                    found_shapes = True
+                area = cv2.contourArea(contour)
+                if area < 30:  # Skip very small contours
                     continue
 
-                # If not elliptical, try as polygon
-                epsilon = 0.02 * cv2.arcLength(contour, True)
-                approx = cv2.approxPolyDP(contour, epsilon, True)
-                points = [(point[0][0], point[0][1]) for point in approx]
-
-                if len(points) > 2:
+                print(f"\nAnalyzing contour with area: {area:.1f}")
+                
+                # Check for square-like shapes first
+                if self.is_square_like(contour):
+                    epsilon = 0.02 * cv2.arcLength(contour, True)
+                    approx = cv2.approxPolyDP(contour, epsilon, True)
+                    points = [(point[0][0], point[0][1]) for point in approx]
                     mask = np.zeros(binary.shape, dtype=np.uint8)
                     cv2.drawContours(mask, [contour], 0, 255, -1)
                     mean_val = cv2.mean(binary, mask=mask)[0]
                     is_filled = mean_val < 127
                     shapes_to_draw.append(('polygon', (points, is_filled)))
                     found_shapes = True
+                    print("  Classified as square/rectangle")
+                    continue
+                
+                # For large shapes, check for ellipses
+                if area >= 1000:
+                    if self.is_elliptical(contour):
+                        ellipse = cv2.fitEllipse(contour)
+                        center, axes, angle = ellipse
+                        mask = np.zeros(binary.shape, dtype=np.uint8)
+                        cv2.drawContours(mask, [contour], 0, 255, -1)
+                        mean_val = cv2.mean(binary, mask=mask)[0]
+                        is_filled = mean_val < 127
+                        shapes_to_draw.append(('ellipse', (center, axes, angle, is_filled)))
+                        found_shapes = True
+                        print("  Large shape classified as ellipse")
+                        continue
+                
+                # For smaller shapes or if large shape wasn't elliptical, try polygon
+                epsilon = 0.02 * cv2.arcLength(contour, True)
+                approx = cv2.approxPolyDP(contour, epsilon, True)
+                points = [(point[0][0], point[0][1]) for point in approx]
+                
+                # Check if it's a good polygon (3-8 sides)
+                if 3 <= len(points) <= 8:
+                    # Calculate polygon metrics
+                    hull = cv2.convexHull(contour)
+                    hull_area = cv2.contourArea(hull)
+                    solidity = area / hull_area if hull_area > 0 else 0
+                    
+                    # If it's a good polygon (high solidity), use it
+                    if solidity > 0.85:
+                        mask = np.zeros(binary.shape, dtype=np.uint8)
+                        cv2.drawContours(mask, [contour], 0, 255, -1)
+                        mean_val = cv2.mean(binary, mask=mask)[0]
+                        is_filled = mean_val < 127
+                        shapes_to_draw.append(('polygon', (points, is_filled)))
+                        found_shapes = True
+                        print("  Classified as simple polygon")
+                        continue
+                
+                # If not a good polygon and small shape, check if it's elliptical
+                if area < 1000:
+                    if self.is_elliptical(contour):
+                        ellipse = cv2.fitEllipse(contour)
+                        center, axes, angle = ellipse
+                        mask = np.zeros(binary.shape, dtype=np.uint8)
+                        cv2.drawContours(mask, [contour], 0, 255, -1)
+                        mean_val = cv2.mean(binary, mask=mask)[0]
+                        is_filled = mean_val < 127
+                        shapes_to_draw.append(('ellipse', (center, axes, angle, is_filled)))
+                        found_shapes = True
+                        print("  Small shape classified as ellipse")
+                        continue
+                
+                # If we get here, try as a complex polygon with more precise approximation
+                epsilon = 0.01 * cv2.arcLength(contour, True)  # More precise approximation
+                approx = cv2.approxPolyDP(contour, epsilon, True)
+                points = [(point[0][0], point[0][1]) for point in approx]
+                mask = np.zeros(binary.shape, dtype=np.uint8)
+                cv2.drawContours(mask, [contour], 0, 255, -1)
+                mean_val = cv2.mean(binary, mask=mask)[0]
+                is_filled = mean_val < 127
+                shapes_to_draw.append(('polygon', (points, is_filled)))
+                found_shapes = True
+                print("  Classified as complex polygon")
 
-            # If we found shapes, draw them
+            # Draw all shapes
             if found_shapes:
                 existing_ellipses = []
                 existing_polygons = []
@@ -475,57 +615,26 @@ class BoxToSVGConverter:
                     if shape_type == 'ellipse':
                         center, axes, angle, is_filled = params
                         if not self.is_similar_ellipse(center, axes, angle, existing_ellipses):
-                            dwg.add(dwg.ellipse(center=center,
-                                              r=(axes[0]/2, axes[1]/2),
-                                              transform=f'rotate({angle}, {center[0]}, {center[1]})',
-                                              fill='black' if is_filled else 'none',
-                                              stroke='black',
-                                              stroke_width=5))
+                            dwg.add(dwg.ellipse(
+                                center=center,
+                                r=(axes[0]/2, axes[1]/2),
+                                transform=f'rotate({angle}, {center[0]}, {center[1]})',
+                                fill='black' if is_filled else 'none',
+                                stroke='black',
+                                stroke_width=5
+                            ))
                             existing_ellipses.append((center, axes, angle))
                     else:  # polygon
                         points, is_filled = params
                         if not self.is_similar_polygon(points, existing_polygons):
                             path_data = 'M ' + ' L '.join([f'{x},{y}' for x, y in points]) + ' Z'
-                            dwg.add(dwg.path(d=path_data,
-                                           fill='black' if is_filled else 'none',
-                                           stroke='black',
-                                           stroke_width=5))
+                            dwg.add(dwg.path(
+                                d=path_data,
+                                fill='black' if is_filled else 'none',
+                                stroke='black',
+                                stroke_width=5
+                            ))
                             existing_polygons.append(points)
-
-            # Only look for lines if no shapes were found
-            else:
-                lines = cv2.HoughLinesP(
-                    255 - binary,
-                    rho=1,
-                    theta=np.pi/180,
-                    threshold=120,
-                    minLineLength=60,
-                    maxLineGap=0
-                )
-
-                if lines is not None:
-                    filtered_lines = []
-                    for line in lines:
-                        x1, y1, x2, y2 = line[0]
-                        
-                        is_similar = False
-                        line_angle = self.get_line_angle(x1, y1, x2, y2)
-                        
-                        for existing_line in filtered_lines:
-                            ex1, ey1, ex2, ey2 = existing_line
-                            if self.is_line_path_near_edge(x1, y1, x2, y2, ex1, ey1, ex2, ey2):
-                                existing_angle = self.get_line_angle(ex1, ey1, ex2, ey2)
-                                if self.angles_are_similar(line_angle, existing_angle, tolerance=30):
-                                    is_similar = True
-                                    break
-                        
-                        if not is_similar:
-                            filtered_lines.append([x1, y1, x2, y2])
-                            path_data = f'M {x1},{y1} L {x2},{y2}'
-                            dwg.add(dwg.path(d=path_data,
-                                           fill='none',
-                                           stroke='black',
-                                           stroke_width=5))
 
             # Save the SVG file
             dwg.save()
@@ -536,11 +645,17 @@ class BoxToSVGConverter:
 
     def process_all_boxes(self):
         """Process all box images in the input folder."""
+        # Check if input folder exists
+        if not self.input_folder.exists():
+            print(f"Error: Input folder not found: {self.input_folder}")
+            return
+
         # Get all PNG files
         box_files = list(self.input_folder.glob("BP*.png"))
 
         if not box_files:
             print(f"No PNG files found in {self.input_folder}")
+            print("Expected files should be named like: BP1_R1.png, BP1_R2.png, etc.")
             return
 
         print(f"Found {len(box_files)} box images to process")
@@ -551,7 +666,8 @@ class BoxToSVGConverter:
         # Process each box
         for box_path in box_files:
             try:
-                self.process_box(box_path)
+                print(f"\nProcessing: {box_path}")
+                self.process_box(str(box_path))  # Convert Path to string
             except Exception as e:
                 print(f"Error processing {box_path.name}: {e}")
                 continue
